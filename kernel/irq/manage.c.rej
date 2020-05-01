@@ -1,0 +1,27 @@
+--- kernel/irq/manage.c
++++ kernel/irq/manage.c
+@@ -226,7 +228,12 @@ int irq_set_affinity_locked(struct irq_data *data, const struct cpumask *mask,
+ 
+ 	if (desc->affinity_notify) {
+ 		kref_get(&desc->affinity_notify->kref);
++
++#ifdef CONFIG_PREEMPT_RT_BASE
++		kthread_schedule_work(&desc->affinity_notify->work);
++#else
+ 		schedule_work(&desc->affinity_notify->work);
++#endif
+ 	}
+ 	irqd_set(data, IRQD_AFFINITY_SET);
+ 
+@@ -347,7 +375,11 @@ irq_set_affinity_notifier(unsigned int irq, struct irq_affinity_notify *notify)
+ 	raw_spin_unlock_irqrestore(&desc->lock, flags);
+ 
+ 	if (old_notify) {
++#ifdef CONFIG_PREEMPT_RT_BASE
++		kthread_cancel_work_sync(&old_notify->work);
++#else
+ 		cancel_work_sync(&old_notify->work);
++#endif
+ 		kref_put(&old_notify->kref, old_notify->release);
+ 	}
+ 
